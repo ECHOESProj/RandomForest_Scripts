@@ -1,9 +1,10 @@
-# import os
+import os
 import subprocess
 import numpy as np
 from zipfile import ZipFile
 
-def Write_Parameters_GrapXML(fs, vs, ris, AOI, NumbTrees, NumbTrainSamples, Outfilename, OutFormat):
+
+def Write_Parameters_GrapXML(fs, vs, ris, AOI, NumbTrees, NumbTrainSamples, Outfilename, OutFormat, Name_AOI):
     
     RadI_Expr_GraphXML = {    'NDVI':'(B8 - B4)/(B8 + B4)' ,
                               'SIPI':'(B8 - B2)/(B8 - B4)',
@@ -38,10 +39,10 @@ def Write_Parameters_GrapXML(fs, vs, ris, AOI, NumbTrees, NumbTrainSamples, Outf
                               'Radiom_Indices': ({'name':BandMaths_names,'type':'float32','expression':BandMaths_exp,'description':'','unit':'','noDataValue':'8888.0'}),
                               'Merge_RadInd':({'sourceBands':'','geographicError':'1.0E-5'}),
                               'GroundPoints': ({'vectorFile':VectorFilenames,'separateShapes':'false'}),
-                              'RandomForest': ({'treeCount':NumbTrees,'numTrainSamples':NumbTrainSamples,'savedClassifierName':'ECHOES_RF',
+                              'RandomForest': ({'treeCount':NumbTrees,'numTrainSamples':NumbTrainSamples,'savedClassifierName':'ECHOES_RF_%s_%s_%s' %(str(NumbTrees),str(NumbTrainSamples), Name_AOI),
                                                             'doLoadClassifier':'false','doClassValQuantization':'true','minClassValue':'0.0','classValStepSize':'5.0',
                                                             'classLevels':'101','trainOnRaster':'false','trainingBands':'','trainingVectors':VectorNames,
-                                                            'featureBands':BandMaths_names,'labelSource':'VectorNodeName','evaluateClassifier':'false',
+                                                            'featureBands':BandMaths_names,'labelSource':'VectorNodeName','evaluateClassifier':'true',
                                                             'evaluateFeaturePowerSet':'false','minPowerSetSize':'2','maxPowerSetSize':'7'}),
                               'LabeLClasses': ({'name':'LabelClasses','type':'float32','expression':LabClass_Exp,'description':'','unit':'','noDataValue':'8888.0'}),
                               'ExtConfidenceBand': ({'sourceBands':'Confidence','region':'','referenceBand':'','geoRegion':AOI,'subSamplingX':'1',
@@ -97,12 +98,12 @@ def Write_Sources_GrapXML (fs, vs, ris):
 
 
 
-def Write_XML_FILE(RS_Images, ground_control_points, AOI,ris,xmlfile,NumbTrees, NumbTrainSamples, Outfilename, OutFormat):
+def Write_XML_FILE(RS_Images, ground_control_points, AOI,ris,xmlfile,NumbTrees, NumbTrainSamples, Outfilename, OutFormat, Name_AOI):
     xmlGraph = '<graph id="Graph">\n  <version>1.0</version>\n'
     xmlAppData = '\t<applicationData\tid="Presentation">\n\t <Description/>\n'
     
     Sources_GrapXML = Write_Sources_GrapXML(RS_Images, ground_control_points, ris)
-    Parameters_GraphXML = Write_Parameters_GrapXML(RS_Images, ground_control_points, ris, AOI, NumbTrees, NumbTrainSamples, Outfilename, OutFormat)
+    Parameters_GraphXML = Write_Parameters_GrapXML(RS_Images, ground_control_points, ris, AOI, NumbTrees, NumbTrainSamples, Outfilename, OutFormat, Name_AOI)
      
     x = 700
     y = 10
@@ -298,14 +299,15 @@ def Write_XML_FILE(RS_Images, ground_control_points, AOI,ris,xmlfile,NumbTrees, 
     
     
 def do_unzip_sentinel(input_path, outpath):
-    filepath=ZipFile(input_path)
-    ZipFile.extractall(filepath, outpath)
+    for in_f in os.listdir(input_path):
+        filepath=ZipFile(input_path + '\\' + in_f)
+        ZipFile.extractall(filepath, outpath)
 
 def AOI_TO_Geom(N, W, E, S):
     geom = "POLYGON ((%s %s, %s %s, %s %s, %s %s, %s %s))"  % (W,N,E,N,E,S,W,S,W,N)
     return geom
 
-def RandomForestAlgorithm(RS_Images, ground_control_points, AOI,ris,xmlfile,NumbTrees, NumbTrainSamples, Outfilename, OutFormat):
+def RandomForestAlgorithm(RS_Images, ground_control_points, AOI,ris,xmlfile,NumbTrees, NumbTrainSamples, Outfilename, OutFormat, Name_AOI):
 
     # raw_sentinel_path = '\\'.join(filepath.split('\\')[:-2])+'\\RAW_SENTINEL'
     # if not os.path.exists(raw_sentinel_path):
@@ -316,9 +318,9 @@ def RandomForestAlgorithm(RS_Images, ground_control_points, AOI,ris,xmlfile,Numb
     # file_input = file_Sentinel+'\\'+'manifest.safe'
 
     polygon = AOI_TO_Geom(AOI['N'],AOI['W'],AOI['E'],AOI['S'])
-    Write_XML_FILE(RS_Images, ground_control_points, polygon,ris,xmlfile,NumbTrees, NumbTrainSamples, Outfilename, OutFormat)
+    Write_XML_FILE(RS_Images, ground_control_points, polygon,ris,xmlfile,NumbTrees, NumbTrainSamples, Outfilename, OutFormat, Name_AOI)
     
-    gpt_Command = "gpt %s " % xmlfile
+    gpt_Command = r'"C:\Program Files\snap\bin\gpt.exe"' + ' ' + '"%s"' % xmlfile
     print ('\n invoking: ' + gpt_Command)
     try:
         process = subprocess.Popen(gpt_Command,
@@ -338,5 +340,7 @@ def RandomForestAlgorithm(RS_Images, ground_control_points, AOI,ris,xmlfile,Numb
             
 
     return Outfilename
+
+
 
 
